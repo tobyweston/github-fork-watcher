@@ -1,39 +1,41 @@
 import React from "react";
+import Box from "@material-ui/core/Box";
+import BuildIcon from '@material-ui/icons/Build';
+import StyledBadge from "./StyledBadge";
 import * as GitHubApi from './GitHubApi'
 import GitHubTestSummary from "./GitHubTestSummary";
-import GitHubBuildStatus from "./GitHubBuildStatus";
 
 class GitHubBuildSummary extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            numberOfBuilds: "?",
-            lastBuildNumber: "?",
-            lastBuildId: 0,
-            buildStatusBadgeUrl: ""
         };
     }
 
-    noResults() {
-        this.setState({
-            numberOfBuilds: '-',
-            lastBuildNumber: '-'
-        });
+    componentDidMount() {
+        this.timerID = setInterval(
+            () => this.getBuilds(),
+            GitHubApi.refreshInterval
+        );
+        this.getBuilds();
     }
 
-    componentDidMount() {
+    componentWillUnmount() {
+        clearInterval(this.timerID);
+    }
+
+    getBuilds() {
         GitHubApi.get(GitHubApi.workflowsUrlFrom(this.props.url))
             .then(response => {
                 const buildWorkflow = response.json.workflows.find(workflow => workflow.name === "build");
                 if (buildWorkflow) {
-                    this.setState({buildStatusBadgeUrl: buildWorkflow.badge_url});
                     this.getLatestBuild(buildWorkflow.id);
-                } else this.noResults();
+                }
             })
     }
 
     getLatestBuild(buildWorkflowId) {
-        GitHubApi.get(GitHubApi.workflowUrlFrom(this.props.url, buildWorkflowId))
+        GitHubApi.get(GitHubApi.workflowRunUrlFrom(this.props.url, buildWorkflowId))
             .then(response => {
                 const numberOfBuilds = response.json.total_count;
                 if (numberOfBuilds > 0) {
@@ -42,24 +44,41 @@ class GitHubBuildSummary extends React.Component {
                         console.log(`Build ${buildNumber} wasn't the last of ${numberOfBuilds} builds for ${this.props.url}`);
                     }
                     const buildId = response.json.workflow_runs[0].id;
+                    const buildStatus = response.json.workflow_runs[0].status;
+                    const buildConclusion = response.json.workflow_runs[0].conclusion;
                     this.setState({
                         numberOfBuilds: numberOfBuilds,
                         lastBuildNumber: buildNumber,
-                        lastBuildId: buildId
+                        lastBuildId: buildId,
+                        lastBuildStatus: buildStatus,
+                        lastBuildConclusion: buildConclusion
                     });
-                } else this.noResults();
+                }
             })
     }
 
     render() {
+        let buildNumber;
+        if (this.state.lastBuildNumber) {
+            buildNumber = this.state.lastBuildNumber +
+                (this.state.lastBuildNumber !== this.state.numberOfBuilds ? "!":"");
+        }
+        let buildIconColor = "disabled";
+        if (this.state.lastBuildConclusion) {
+            buildIconColor = this.state.lastBuildConclusion === "failure" ? 'error' : 'action';
+        }
+        const buildBadgeColor = this.state.lastBuildConclusion === "failure" ? 'error' : 'primary';
+
         return (
-            <span>
-                <GitHubBuildStatus url={this.state.buildStatusBadgeUrl}/>
-                <span>{this.state.lastBuildNumber}{this.state.lastBuildNumber !== this.state.numberOfBuilds ? "(!)":""}</span>
-                {this.state.lastBuildId > 0 &&
-                    <GitHubTestSummary url={this.props.url} buildId={this.state.lastBuildId}/>
-                }
-            </span>
+            <Box display="flex" alignItems="center">
+                <StyledBadge badgeContent={buildNumber} color={buildBadgeColor}>
+                    <BuildIcon color={buildIconColor}/>
+                </StyledBadge>
+                <GitHubTestSummary
+                    url={this.props.url}
+                    buildId={this.state.lastBuildId}
+                    buildStatus={this.state.lastBuildStatus}/>
+            </Box>
         );
     }
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import Box from "@material-ui/core/Box";
 import * as GitHubApi from './GitHubApi'
 import * as unzipper from "unzipper";
 import {getRaw} from "./GitHubApi";
@@ -15,13 +16,25 @@ class GitHubTestSummary extends React.Component {
     }
 
     componentDidMount() {
-        GitHubApi.get(GitHubApi.artifactsUrlFrom(this.props.url, this.props.buildId))
-            .then(response => {
-                const testResultsArtifact = response.json.artifacts.find(artifact => artifact.name === "test-results");
-                if (testResultsArtifact) {
-                    this.getZipArtifact(testResultsArtifact.archive_download_url);
-                }
-            })
+        this.getArtifacts();
+    }
+
+    componentDidUpdate(prevProps, prevState, snapshot) {
+        if (prevProps.buildId !== this.props.buildId || prevProps.buildStatus !== this.props.buildStatus) {
+            this.getArtifacts();
+        }
+    }
+
+    getArtifacts() {
+        if (this.props.buildId && this.props.buildStatus === 'completed') {
+            GitHubApi.get(GitHubApi.artifactsUrlFrom(this.props.url, this.props.buildId))
+                .then(response => {
+                    const testResultsArtifact = response.json.artifacts.find(artifact => artifact.name === "test-results");
+                    if (testResultsArtifact) {
+                        this.getZipArtifact(testResultsArtifact.archive_download_url);
+                    }
+                })
+        }
     }
 
     getZipArtifact(artifactUrl) {
@@ -55,10 +68,10 @@ class GitHubTestSummary extends React.Component {
 
     render() {
         return (
-            <span>
+            <Box display="flex" alignItems="center">
                 <GitHubTestResults json={this.state.testResults}/>
                 <GitHubCoverage xml={this.state.coverageResults}/>
-            </span>
+            </Box>
         );
     }
 }

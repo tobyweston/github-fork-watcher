@@ -1,9 +1,13 @@
 import {Base64} from "js-base64";
-import {credentials} from "./credentials";
+import {credentials} from "./settings";
 
+export const refreshInterval = 10000;
+
+export const forksUrl = "https://api.github.com/repos/xp-dojo-classes/tdd-bank-account-java/forks?per_page=1000";
 export const actionsUrlFrom = (repoUrl) => { return `${repoUrl}/actions`; }
+export const commitsUrlFrom = (repoUrl) => { return `${repoUrl}/commits`; }
 export const workflowsUrlFrom = (repoUrl) => { return `${actionsUrlFrom(repoUrl)}/workflows`; }
-export const workflowUrlFrom = (repoUrl, workflowId) => {
+export const workflowRunUrlFrom = (repoUrl, workflowId) => {
     return `${workflowsUrlFrom(repoUrl)}/${workflowId}/runs?per_page=1`;
 }
 export const artifactsUrlFrom = (repoUrl, buildId) => {
@@ -20,6 +24,7 @@ export class GitHubApiResponse {
 
 export const getRaw = (url) => {
     const headers = new Headers();
+    headers.set('Accept', 'application/vnd.github.v3+json');
     headers.set('Authorization', 'Basic ' + Base64.encode(credentials.username + ":" + credentials.password));
     return fetch(url, { method: 'GET', headers: headers });
 }

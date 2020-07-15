@@ -1,4 +1,10 @@
 import React from "react";
+import Alert from "@material-ui/lab/Alert";
+import Box from "@material-ui/core/Box";
+import Card from '@material-ui/core/Card';
+import CircularProgress from "@material-ui/core/CircularProgress";
+import Grid from "@material-ui/core/Grid";
+import Link from "@material-ui/core/Link";
 import * as GitHubApi from './GitHubApi'
 import GitHubUser from "./GitHubUser";
 import GitHubCommitCount from "./GitHubCommitCount";
@@ -13,7 +19,19 @@ class GitHubForks extends React.Component {
     }
 
     componentDidMount() {
-        GitHubApi.get("https://api.github.com/repos/xp-dojo-classes/tdd-bank-account-java/forks")
+        this.timerID = setInterval(
+            () => this.getForks(),
+            GitHubApi.refreshInterval
+        );
+        this.getForks();
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.timerID);
+    }
+
+    getForks() {
+        GitHubApi.get(GitHubApi.forksUrl)
             .then(response => {
                 this.setState({apiResponse: response});
             })
@@ -22,22 +40,38 @@ class GitHubForks extends React.Component {
     render() {
         const { statusOk, isLoaded, json, error } = this.state.apiResponse;
         if (error) {
-            return <div>Error: {error.message}</div>;
+            return <Alert variant="filled" severity="error">{error.message}</Alert>;
         } else if (!isLoaded) {
-            return <div>Loading...</div>;
+            return (
+                <Grid container alignItems="center" justify="center">
+                    <CircularProgress />
+                </Grid>
+            );
         } else if (!statusOk) {
-            return <div>{json.message}</div>;
+            return <Alert variant="filled" severity="error">{json.message}</Alert>;
         } else {
             return (
-                <div>
-                    {json.map(item => (
-                        <div key={item.owner.login}>
-                            <GitHubUser url={item.owner.url}/>
-                            <GitHubCommitCount url={item.commits_url}/>
-                            <GitHubBuildSummary url={item.url}/>
-                        </div>
+                <Grid container direction="row" justify="center">
+                    {json.map(fork => (
+                        <Box key={fork.owner.login} width={400} m={0.5}>
+                            <Card raised={true} square={true}>
+                                <Box m={0.5} display="flex" alignItems="center">
+                                    <Link href={fork.html_url} >
+                                        <GitHubUser url={fork.owner.url}/>
+                                    </Link>
+
+                                    <Link href={GitHubApi.commitsUrlFrom(fork.html_url)} >
+                                        <GitHubCommitCount url={fork.commits_url}/>
+                                    </Link>
+
+                                    <Link href={GitHubApi.actionsUrlFrom(fork.html_url)} >
+                                        <GitHubBuildSummary url={fork.url}/>
+                                    </Link>
+                                </Box>
+                            </Card>
+                        </Box>
                     ))}
-                </div>
+                </Grid>
             );
         }
     }
